@@ -12,7 +12,7 @@ pub fn configure(app: App) -> Result<Config, Error> {
         .set_default::<&str>("cfg_file", concat!(env!("CARGO_PKG_NAME"), ".toml"))
         .context(ErrorKind::ConfigImmutable)?;
     config
-        .set_default::<&str>("log_file", concat!(env!("CARGO_PKG_NAME"), ".log"))
+        .set_default::<&str>("log_file", "_CONSOLE_")
         .context(ErrorKind::ConfigImmutable)?;
     config
         .set_default::<&str>("Web.Listen.address", "127.0.0.1")
@@ -149,6 +149,8 @@ impl From<Context<ErrorKind>> for CommonError {
 pub enum ErrorKind {
     #[fail(display = "Unsupported database scheme, only 'postgres' and 'postgresql' are allowed.")]
     UnsupportedDbScheme,
-    #[fail(display = "Configuration was missing expected keys")] ConfigMissingKeys,
-    #[fail(display = "Config struct cannot be modified")] ConfigImmutable,
+    #[fail(display = "Configuration was missing expected keys")]
+    ConfigMissingKeys,
+    #[fail(display = "Config struct cannot be modified")]
+    ConfigImmutable,
 }

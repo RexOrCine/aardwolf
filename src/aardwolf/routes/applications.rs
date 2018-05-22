@@ -3,20 +3,20 @@
 use failure::Error;
 use rocket_contrib::Json;
 
-use models::scope::Scope;
-use models::apps::{App, AppId};
+use types::scope::Scope;
+use types::apps::{App, AppId};
 use controllers;
 
 mod deser_scope {
-    use std::convert::TryFrom;
-    use models::scope::Scope;
+    use types::scope::Scope;
     use serde::{self, Deserialize, Deserializer};
 
     pub(crate) fn deserialize<'de, D>(deserializer: D) -> Result<Scope, D::Error>
-        where D: Deserializer<'de>
+    where
+        D: Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        TryFrom::try_from(s).map_err(serde::de::Error::custom)
+        s.parse::<Scope>().map_err(serde::de::Error::custom)
     }
 }
 
@@ -67,5 +67,3 @@ fn register_application(app: Json<CreateApp>) -> Result<Json<AppId>, Error> {
     app.validate()?;
     Ok(Json(controllers::apps::create(App::from(&app))?))
 }
-
-

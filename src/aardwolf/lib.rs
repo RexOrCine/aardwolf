@@ -1,37 +1,42 @@
-#![recursion_limit="128"]
-#![feature(try_from)]
+#![recursion_limit = "128"]
 #![feature(plugin)]
 #![feature(custom_derive)]
 #![plugin(rocket_codegen)]
 
-extern crate bs58;
+extern crate aardwolf_models;
 extern crate bcrypt;
+extern crate bs58;
 extern crate chrono;
-extern crate ring;
-extern crate rocket;
+#[macro_use]
+extern crate collection_macros;
+#[macro_use]
+extern crate derive_builder;
+extern crate diesel;
+#[macro_use]
+extern crate failure;
 extern crate r2d2;
 extern crate r2d2_diesel;
+extern crate ring;
+extern crate rocket;
 extern crate rocket_contrib;
 extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+extern crate url;
+extern crate url_serde;
 extern crate uuid;
-#[macro_use] extern crate failure;
-#[macro_use] extern crate serde_derive;
-#[macro_use] extern crate derive_builder;
-#[macro_use] extern crate collection_macros;
-#[macro_use] extern crate diesel;
 
 use std::ops::Deref;
 use rocket::http::Status;
 use rocket::request::{self, FromRequest};
-use rocket::{Request, State, Outcome};
+use rocket::{Outcome, Request, State};
 use r2d2_diesel::ConnectionManager;
 use diesel::pg::PgConnection;
 
-pub mod models;
 pub mod controllers;
 pub mod forms;
+pub mod types;
 pub mod routes;
-pub mod schema;
 
 pub type Pool = r2d2::Pool<ConnectionManager<PgConnection>>;
 

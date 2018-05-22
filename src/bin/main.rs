@@ -10,11 +10,19 @@ extern crate diesel;
 extern crate failure;
 extern crate r2d2;
 extern crate r2d2_diesel;
-extern crate ring;
+// extern crate ring;
 extern crate rocket;
 extern crate rocket_contrib;
 extern crate serde;
 extern crate yaml_rust;
+extern crate log;
+
+#[cfg(feature = "log-syslog")]
+extern crate syslog;
+#[cfg(feature = "use-systemd")]
+extern crate systemd;
+#[cfg(feature = "log-simple")]
+extern crate simple_logging;
 
 extern crate _aardwolf as aardwolf;
 
@@ -22,12 +30,13 @@ mod common;
 use common::{configure, db_conn_string};
 
 use failure::Error;
-use ring::rand::SystemRandom;
+// use ring::rand::SystemRandom;
 use rocket::Rocket;
 use rocket_contrib::Template;
 use diesel::pg::PgConnection;
 use r2d2_diesel::ConnectionManager;
 use clap::App;
+use log::LevelFilter;
 
 type Pool = r2d2::Pool<ConnectionManager<PgConnection>>;
 
@@ -46,9 +55,22 @@ fn app(config: config::Config) -> Result<Rocket, Error> {
         .extra("database_url", db_url.as_str())
         .unwrap();
 
-    let mut routes = Vec::new();
+    let mut routes = routes![
+        aardwolf::routes::app::home,
+        aardwolf::routes::app::home_redirect,
+    ];
 
+    #[cfg(debug_assertions)]
     routes.extend(routes![
+        // webroot/favicon
+        aardwolf::routes::app::webroot,
+        // emoji
+        aardwolf::routes::app::emoji,
+        // themes
+        aardwolf::routes::app::themes,
+    ]);
+
+    let auth = routes![
         aardwolf::routes::auth::sign_up_form,
         aardwolf::routes::auth::sign_up_form_with_error,
         aardwolf::routes::auth::sign_in_form,
@@ -57,36 +79,25 @@ fn app(config: config::Config) -> Result<Rocket, Error> {
         aardwolf::routes::auth::sign_in,
         aardwolf::routes::auth::confirm,
         aardwolf::routes::auth::sign_out,
-        aardwolf::routes::app::home,
-        aardwolf::routes::app::home_redirect,
-    ]);
+    ];
 
-    #[cfg(debug_assertions)]
-    routes.extend(routes![
-        // webroot/favicon
-        aardwolf::routes::app::webroot,
-        // emoji
-        aardwolf::routes::app::emoji,
-        // fork_awesome
-        aardwolf::routes::app::fork_awesome,
-        // images
-        aardwolf::routes::app::images,
-        // javascript
-        aardwolf::routes::app::javascript,
-        // stylesheets
-        aardwolf::routes::app::stylesheets,
-        // themes
-        aardwolf::routes::app::themes,
-    ]);
+    let personas = routes![
+        aardwolf::routes::personas::new,
+        aardwolf::routes::personas::create,
+        aardwolf::routes::personas::delete,
+        aardwolf::routes::personas::switch,
+    ];
 
     let r = rocket::custom(c, true)
+        .mount("/auth", auth)
+        .mount("/personas", personas)
         .mount(
             "/api/v1",
             routes![aardwolf::routes::applications::register_application],
         )
         .mount("/", routes)
-        .attach(Template::fairing())
-        .manage(SystemRandom::new());
+        .attach(Template::fairing());
+    // .manage(SystemRandom::new());
 
     // we need an instance of the app to access the config values in Rocket.toml,
     // so we pass it to the db_pool function, get the pool, and _then_ return the instance
@@ -102,10 +113,29 @@ fn cli<'a, 'b>(yaml: &'a yaml_rust::yaml::Yaml) -> App<'a, 'b> {
         .about(env!("CARGO_PKG_DESCRIPTION"))
 }
 
+#[cfg(feature = "log-simple")]
+fn begin_log(config: &config::Config) {
+    match config.get_str("log_file").unwrap().as_ref() {
+        "_CONSOLE_" => (),
+        l => simple_logging::log_to_file(l, LevelFilter::Info).unwrap(),
+    }
+}
+
+#[cfg(feature = "log-syslog")]
+fn begin_log(config: &config::Config) {
+    // TODO: Implement log-syslog:begin_log()
+}
+
+#[cfg(feature = "use-systemd")]
+fn begin_log(config: &config::Config) {
+    // TODO: Implement use-systemd:begin_log()
+}
+
 fn main() {
     let yaml = load_yaml!("cli.yml");
     let cli = cli(&yaml);
     let config = configure(cli).unwrap();
+    begin_log(&config);
 
     app(config).unwrap().launch();
 }

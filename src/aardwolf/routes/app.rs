@@ -4,13 +4,15 @@ use rocket::response::{NamedFile, Redirect};
 use rocket::response::status::NotFound;
 use rocket_contrib::Template;
 
-use models::user::User;
 use DbConn;
+use types::SignedInUserWithEmail;
 
 #[get("/")]
-fn home(user: User, _db: DbConn) -> Template {
+fn home(user: SignedInUserWithEmail, _db: DbConn) -> Template {
     let map = hashmap!{
-        "email" => user.email,
+        "email" => user.1.to_verified()
+            .map(|verified| verified.email().to_owned())
+            .unwrap_or_else(|unverified| unverified.email().to_owned()),
     };
     Template::render("home", map)
 }
@@ -30,7 +32,7 @@ fn home_redirect() -> Redirect {
 #[cfg(debug_assertions)]
 #[get("/web/<file..>")]
 fn webroot(file: PathBuf) -> Result<NamedFile, NotFound<String>> {
-    let path = Path::new("web/").join(file);
+    let path = Path::new("dist/").join(file);
     NamedFile::open(&path).map_err(|_| NotFound(format!("Bad path: {:?}", path)))
 }
 
@@ -39,38 +41,6 @@ fn webroot(file: PathBuf) -> Result<NamedFile, NotFound<String>> {
 #[get("/emoji/<file..>")]
 fn emoji(file: PathBuf) -> Result<NamedFile, NotFound<String>> {
     let path = Path::new("emoji/").join(file);
-    NamedFile::open(&path).map_err(|_| NotFound(format!("Bad path: {:?}", path)))
-}
-
-// Fork-Awesome folder
-#[cfg(debug_assertions)]
-#[get("/Fork-Awesome-1.0.10/<file..>")]
-fn fork_awesome(file: PathBuf) -> Result<NamedFile, NotFound<String>> {
-    let path = Path::new("Fork-Awesome-1.0.10/").join(file);
-    NamedFile::open(&path).map_err(|_| NotFound(format!("Bad path: {:?}", path)))
-}
-
-// Images folder
-#[cfg(debug_assertions)]
-#[get("/images/<file..>")]
-fn images(file: PathBuf) -> Result<NamedFile, NotFound<String>> {
-    let path = Path::new("web/images/").join(file);
-    NamedFile::open(&path).map_err(|_| NotFound(format!("Bad path: {:?}", path)))
-}
-
-// Javascript folder
-#[cfg(debug_assertions)]
-#[get("/javascript/<file..>")]
-fn javascript(file: PathBuf) -> Result<NamedFile, NotFound<String>> {
-    let path = Path::new("web/javascript/").join(file);
-    NamedFile::open(&path).map_err(|_| NotFound(format!("Bad path: {:?}", path)))
-}
-
-// Stylesheets folder
-#[cfg(debug_assertions)]
-#[get("/stylesheets/<file..>")]
-fn stylesheets(file: PathBuf) -> Result<NamedFile, NotFound<String>> {
-    let path = Path::new("web/stylesheets/").join(file);
     NamedFile::open(&path).map_err(|_| NotFound(format!("Bad path: {:?}", path)))
 }
 

@@ -2,7 +2,11 @@
   <div class="container">
 	<div class="navbar-brand">
 	  <a class="navbar-item">
+<<<<<<< HEAD:templates/includes/home_nav_top.html.tera
 		<img src="/images/aardwolf-logo.png" alt="Aardwolf">
+=======
+        <div class="aardwolf-logo"></div>
+>>>>>>> origin/master:templates/home_nav_top.html.hbs
 	  </a>
 	  <span class="navbar-burger burger" data-target="navbar_menu_hero_a">
 		<span></span>

@@ -1,26 +1,29 @@
-use ring::rand::SystemRandom;
-use rocket::State;
+use aardwolf_models::user::email::EmailVerificationToken;
+// use ring::rand::SystemRandom;
 use rocket::http::{Cookie, Cookies};
 use rocket::response::Redirect;
 use rocket::request::Form;
 use rocket_contrib::Template;
 
 use DbConn;
-use models::user::User;
-use forms::auth::{SignUpForm, SignInForm};
+use forms::auth::{SignInForm, SignUpForm};
+use types::SignedInUser;
 
 #[derive(FromForm)]
 struct SignUpError {
-    msg: String
+    msg: String,
 }
 
-#[get("/auth/sign_up?<error>")]
+#[get("/sign_up?<error>")]
 fn sign_up_form_with_error(error: SignUpError) -> Template {
     let token = "some csrf token";
-    Template::render("sign_up", hashmap!{ "token" => token, "error_msg" => error.msg.as_str() })
+    Template::render(
+        "sign_up",
+        hashmap!{ "token" => token, "error_msg" => error.msg.as_str() },
+    )
 }
 
-#[get("/auth/sign_up")]
+#[get("/sign_up")]
 fn sign_up_form() -> Template {
     let token = "some csrf token";
     Template::render("sign_up", hashmap!{ "token" => token })
@@ -28,26 +31,29 @@ fn sign_up_form() -> Template {
 
 #[derive(FromForm)]
 struct SignInError {
-    msg: String
+    msg: String,
 }
 
-#[get("/auth/sign_in?<error>")]
+#[get("/sign_in?<error>")]
 fn sign_in_form_with_error(error: SignInError) -> Template {
     let token = "some csrf token";
-    Template::render("sign_in", hashmap!{ "token" => token, "error_msg" => error.msg.as_str() })
+    Template::render(
+        "sign_in",
+        hashmap!{ "token" => token, "error_msg" => error.msg.as_str() },
+    )
 }
 
-#[get("/auth/sign_in")]
+#[get("/sign_in")]
 fn sign_in_form() -> Template {
     let token = "some csrf token";
     Template::render("sign_in", hashmap!{ "token" => token })
 }
 
-#[post("/auth", data = "<form>")]
-fn sign_up(form: Form<SignUpForm>, gen: State<SystemRandom>, db: DbConn) -> Redirect {
+#[post("/sign_up", data = "<form>")]
+fn sign_up(form: Form<SignUpForm>, db: DbConn) -> Redirect {
     use controllers::auth;
 
-    match auth::create_user_and_account(form.into_inner(), gen.inner(), &db) {
+    match auth::create_user_and_account(form.into_inner(), &db) {
         Ok(_) => Redirect::to("/auth/sign_in"),
         Err(e) => {
             println!("unable to create account: {:#?}", e);
@@ -56,16 +62,18 @@ fn sign_up(form: Form<SignUpForm>, gen: State<SystemRandom>, db: DbConn) -> Redi
     }
 }
 
-#[post("/auth/sign_in", data = "<form>")]
+#[post("/sign_in", data = "<form>")]
 fn sign_in(form: Form<SignInForm>, db: DbConn, mut cookies: Cookies) -> Redirect {
     use controllers::auth;
-    match auth::sign_in(&form.into_inner(), &db) {
+    use aardwolf_models::user::UserLike;
+
+    match auth::sign_in(form.into_inner(), &db) {
         Ok(user) => {
-            let mut cookie = Cookie::new("user_id", user.id.to_string());
+            let mut cookie = Cookie::new("user_id", format!("{}", user.id()));
             cookie.set_http_only(true);
             cookies.add_private(cookie);
             Redirect::to("/")
-        },
+        }
         Err(e) => {
             println!("unable to log in: {:#?}", e);
             Redirect::to(&format!("/auth/sign_in?msg={}", e))
@@ -75,18 +83,19 @@ fn sign_in(form: Form<SignInForm>, db: DbConn, mut cookies: Cookies) -> Redirect
 
 #[derive(FromForm)]
 struct ConfirmToken {
-    pub token: String,
+    pub id: i32,
+    pub token: EmailVerificationToken,
 }
 
 #[derive(Debug, Fail)]
 #[fail(display = "Failed to confirm account")]
 struct ConfirmError;
 
-#[get("/auth/confirmation?<token>")]
+#[get("/confirmation?<token>")]
 fn confirm(token: ConfirmToken, db: DbConn) -> Result<Redirect, ConfirmError> {
     use controllers::auth;
 
-    Ok(match auth::confirm_account(&token.token, &db) {
+    Ok(match auth::confirm_account(token.id, token.token, &db) {
         Ok(_) => Redirect::to("/auth/sign_in"),
         Err(e) => {
             println!("unable to confirm account: {:#?}", e);
@@ -95,8 +104,8 @@ fn confirm(token: ConfirmToken, db: DbConn) -> Result<Redirect, ConfirmError> {
     })
 }
 
-#[post("/auth/sign_out")]
-fn sign_out(_user: User, mut cookies: Cookies) -> Redirect {
+#[post("/sign_out")]
+fn sign_out(_user: SignedInUser, mut cookies: Cookies) -> Redirect {
     cookies.remove_private(Cookie::named("user_id"));
     Redirect::to("/auth/sign_in")
 }
